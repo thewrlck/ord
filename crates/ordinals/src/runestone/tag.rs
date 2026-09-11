@@ -14,6 +14,8 @@ pub(super) enum Tag {
   OffsetEnd = 18,
   Mint = 20,
   Pointer = 22,
+  Control = 24,
+  MintAmount = 26,
   #[allow(unused)]
   Cenotaph = 126,
 
@@ -83,6 +85,8 @@ mod tests {
   fn from_u128() {
     assert_eq!(0u128, Tag::Body.into());
     assert_eq!(2u128, Tag::Flags.into());
+    assert_eq!(24u128, Tag::Control.into());
+    assert_eq!(26u128, Tag::MintAmount.into());
   }
 
   #[test]

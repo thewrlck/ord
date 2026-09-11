@@ -21,13 +21,14 @@ impl RuneUpdater<'_, '_, '_> {
   pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid) -> Result<()> {
     let artifact = Runestone::decipher(tx);
 
-    let mut unallocated = self.unallocated(tx)?;
+    let input_balances = self.unallocated(tx)?;
+    let mut unallocated = input_balances.clone();
 
     let mut allocated: Vec<HashMap<RuneId, Lot>> = vec![HashMap::new(); tx.output.len()];
 
     if let Some(artifact) = &artifact {
       if let Some(id) = artifact.mint()
-        && let Some(amount) = self.mint(id)?
+        && let Some(amount) = self.mint(id, artifact.mint_amount(), &input_balances)?
       {
         *unallocated.entry(id).or_default() += amount;
 
@@ -41,7 +42,7 @@ impl RuneUpdater<'_, '_, '_> {
         }
       }
 
-      let etched = self.etched(tx_index, tx, artifact)?;
+      let etched = self.etched(tx_index, tx, artifact, &input_balances)?;
 
       if let Artifact::Runestone(runestone) = artifact {
         if let Some((id, ..)) = etched {
@@ -264,6 +265,8 @@ impl RuneUpdater<'_, '_, '_> {
       Artifact::Cenotaph(_) => RuneEntry {
         block: id.block,
         burned: 0,
+        control: None,
+        controlled_minted: 0,
         divisibility: 0,
         etching: txid,
         terms: None,
@@ -277,6 +280,7 @@ impl RuneUpdater<'_, '_, '_> {
       },
       Artifact::Runestone(Runestone { etching, .. }) => {
         let Etching {
+          control,
           divisibility,
           terms,
           premine,
@@ -289,6 +293,8 @@ impl RuneUpdater<'_, '_, '_> {
         RuneEntry {
           block: id.block,
           burned: 0,
+          control,
+          controlled_minted: 0,
           divisibility: divisibility.unwrap_or_default(),
           etching: txid,
           terms,
@@ -335,6 +341,7 @@ impl RuneUpdater<'_, '_, '_> {
     tx_index: u32,
     tx: &Transaction,
     artifact: &Artifact,
+    input_balances: &HashMap<RuneId, Lot>,
   ) -> Result<Option<(RuneId, Rune)>> {
     let rune = match artifact {
       Artifact::Runestone(runestone) => match runestone.etching {
@@ -346,6 +353,23 @@ impl RuneUpdater<'_, '_, '_> {
         None => return Ok(None),
       },
     };
+
+    let control = match artifact {
+      Artifact::Runestone(Runestone {
+        etching: Some(Etching { control, .. }),
+        ..
+      }) => *control,
+      Artifact::Cenotaph(cenotaph) => cenotaph.control,
+      _ => None,
+    };
+
+    if control.is_some_and(|control| {
+      !input_balances
+        .get(&control)
+        .is_some_and(|balance| *balance > 0)
+    }) {
+      return Ok(None);
+    }
 
     let rune = if let Some(rune) = rune {
       if rune < self.minimum
@@ -379,20 +403,52 @@ impl RuneUpdater<'_, '_, '_> {
     )))
   }
 
-  fn mint(&mut self, id: RuneId) -> Result<Option<Lot>> {
+  fn mint(
+    &mut self,
+    id: RuneId,
+    mint_amount: Option<u128>,
+    input_balances: &HashMap<RuneId, Lot>,
+  ) -> Result<Option<Lot>> {
     let Some(entry) = self.id_to_entry.get(&id.store())? else {
       return Ok(None);
     };
 
     let mut rune_entry = RuneEntry::load(entry.value());
 
-    let Ok(amount) = rune_entry.mintable(self.height.into()) else {
-      return Ok(None);
+    let amount = if let Some(amount) = mint_amount {
+      let Some(control) = rune_entry.control else {
+        return Ok(None);
+      };
+
+      if amount == 0
+        || !input_balances
+          .get(&control)
+          .is_some_and(|balance| *balance > 0)
+        || rune_entry
+          .open_max_supply()
+          .checked_add(rune_entry.controlled_minted)
+          .and_then(|supply| supply.checked_add(amount))
+          .is_none()
+      {
+        return Ok(None);
+      }
+
+      rune_entry.controlled_minted += amount;
+      amount
+    } else {
+      let Ok(amount) = rune_entry.mintable(self.height.into()) else {
+        return Ok(None);
+      };
+
+      if rune_entry.supply().checked_add(amount).is_none() {
+        return Ok(None);
+      }
+
+      rune_entry.mints = rune_entry.mints.checked_add(1).unwrap();
+      amount
     };
 
     drop(entry);
-
-    rune_entry.mints += 1;
 
     self.id_to_entry.insert(&id.store(), rune_entry.store())?;
 

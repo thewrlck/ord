@@ -22,13 +22,16 @@ reinscribe: true
 
 # rune to etch (optional)
 etching:
+  # optional rune whose possession controls additional minting
+  # control: CONTROL•RUNE
   # rune name
   rune: THE•BEST•RUNE
   # allow subdividing super-unit into `10^divisibility` sub-units
   divisibility: 2
   # premine
   premine: 1000.00
-  # total supply, must be equal to `premine + terms.cap * terms.amount`
+  # premine plus maximum permissionless supply; controlled mints are excluded
+  # must be equal to `premine + terms.cap * terms.amount`
   supply: 10000.00
   # currency symbol
   symbol: $

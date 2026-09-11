@@ -183,6 +183,7 @@ fn etch(core: &mockcore::Handle, ord: &TestServer, rune: Rune) -> Etched {
     ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         supply: "1000".parse().unwrap(),
         divisibility: 0,
         terms: None,
@@ -243,6 +244,7 @@ fn batch(core: &mockcore::Handle, ord: &TestServer, batchfile: batch::File) -> E
   let parent = output.inscriptions[0].id;
 
   let batch::Etching {
+    control: _,
     divisibility,
     premine,
     rune,

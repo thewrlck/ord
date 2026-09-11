@@ -17,6 +17,7 @@ fn wallet_pending() {
 
   let batchfile = batch::File {
     etching: Some(batch::Etching {
+      control: None,
       divisibility: 0,
       rune: SpacedRune {
         rune: Rune(RUNE),

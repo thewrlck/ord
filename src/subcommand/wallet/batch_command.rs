@@ -58,12 +58,15 @@ impl Batch {
         .map(|(satpoint, txout)| (satpoint.outpoint, txout.clone())),
     );
 
-    if let Some(etching) = batchfile.etching {
-      Self::check_etching(&wallet, &etching)?;
-    }
+    let control_info = batchfile
+      .etching
+      .map(|etching| Self::check_etching(&wallet, &etching))
+      .transpose()?
+      .flatten();
 
     batch::Plan {
       commit_fee_rate: self.shared.commit_fee_rate.unwrap_or(self.shared.fee_rate),
+      control_info,
       destinations,
       dry_run: self.shared.dry_run,
       etching: batchfile.etching,
@@ -90,7 +93,10 @@ impl Batch {
     )
   }
 
-  fn check_etching(wallet: &Wallet, etching: &batch::Etching) -> Result {
+  fn check_etching(
+    wallet: &Wallet,
+    etching: &batch::Etching,
+  ) -> Result<Option<batch::RuneControlInfo>> {
     let rune = etching.rune.rune;
 
     ensure!(
@@ -138,7 +144,10 @@ impl Batch {
       "`supply` not equal to `premine` + `terms.cap` * `terms.amount`"
     );
 
-    ensure!(supply > 0, "`supply` must be greater than zero");
+    ensure!(
+      supply > 0 || etching.control.is_some(),
+      "`supply` must be greater than zero"
+    );
 
     let bitcoin_client = wallet.bitcoin_client();
 
@@ -197,7 +206,15 @@ impl Batch {
       "rune is less than minimum for next block: {rune} < {minimum}",
     );
 
-    Ok(())
+    etching
+      .control
+      .map(|control| {
+        let (id, _, _) = wallet
+          .get_rune(control.rune)?
+          .with_context(|| format!("control rune `{control}` has not been etched"))?;
+        wallet.get_rune_control_info(id)
+      })
+      .transpose()
   }
 }
 

@@ -9,6 +9,7 @@ pub struct Runestone {
   pub edicts: Vec<Edict>,
   pub etching: Option<Etching>,
   pub mint: Option<RuneId>,
+  pub mint_amount: Option<u128>,
   pub pointer: Option<u32>,
 }
 
@@ -52,6 +53,9 @@ impl Runestone {
       .unwrap_or_default();
 
     let etching = Flag::Etching.take(&mut flags).then(|| Etching {
+      control: Tag::Control.take(&mut fields, |[block, tx]| {
+        RuneId::new(block.try_into().ok()?, tx.try_into().ok()?)
+      }),
       divisibility: Tag::Divisibility.take(&mut fields, |[divisibility]| {
         let divisibility = u8::try_from(divisibility).ok()?;
         (divisibility <= Etching::MAX_DIVISIBILITY).then_some(divisibility)
@@ -90,6 +94,8 @@ impl Runestone {
       RuneId::new(block.try_into().ok()?, tx.try_into().ok()?)
     });
 
+    let mint_amount = Tag::MintAmount.take(&mut fields, |[amount]| Some(amount));
+
     let pointer = Tag::Pointer.take(&mut fields, |[pointer]| {
       let pointer = u32::try_from(pointer).ok()?;
       (u64::from(pointer) < u64::try_from(transaction.output.len()).unwrap()).then_some(pointer)
@@ -102,6 +108,10 @@ impl Runestone {
       flaw.get_or_insert(Flaw::SupplyOverflow);
     }
 
+    if mint_amount.is_some() && mint.is_none() {
+      flaw.get_or_insert(Flaw::UnrecognizedEvenTag);
+    }
+
     if flags != 0 {
       flaw.get_or_insert(Flaw::UnrecognizedFlag);
     }
@@ -112,8 +122,10 @@ impl Runestone {
 
     if let Some(flaw) = flaw {
       return Some(Artifact::Cenotaph(Cenotaph {
+        control: etching.and_then(|etching| etching.control),
         flaw: Some(flaw),
         mint,
+        mint_amount,
         etching: etching.and_then(|etching| etching.rune),
       }));
     }
@@ -122,6 +134,7 @@ impl Runestone {
       edicts,
       etching,
       mint,
+      mint_amount,
       pointer,
     }))
   }
@@ -157,11 +170,17 @@ impl Runestone {
         Tag::OffsetStart.encode_option(terms.offset.0, &mut payload);
         Tag::OffsetEnd.encode_option(terms.offset.1, &mut payload);
       }
+
+      if let Some(RuneId { block, tx }) = etching.control {
+        Tag::Control.encode([block.into(), tx.into()], &mut payload);
+      }
     }
 
     if let Some(RuneId { block, tx }) = self.mint {
       Tag::Mint.encode([block.into(), tx.into()], &mut payload);
     }
+
+    Tag::MintAmount.encode_option(self.mint_amount, &mut payload);
 
     Tag::Pointer.encode_option(self.pointer, &mut payload);
 
@@ -1116,6 +1135,7 @@ mod tests {
           output: 0,
         }],
         etching: Some(Etching {
+          control: None,
           divisibility: Some(1),
           premine: Some(8),
           rune: Some(Rune(4)),
@@ -1131,6 +1151,7 @@ mod tests {
         }),
         pointer: Some(0),
         mint: Some(RuneId::new(1, 1).unwrap()),
+        mint_amount: None,
       }),
     );
   }
@@ -1423,6 +1444,7 @@ mod tests {
     case(
       Vec::new(),
       Some(Etching {
+        control: None,
         divisibility: Some(Etching::MAX_DIVISIBILITY),
         rune: Some(Rune(0)),
         ..default()
@@ -1433,6 +1455,7 @@ mod tests {
     case(
       Vec::new(),
       Some(Etching {
+        control: None,
         divisibility: Some(Etching::MAX_DIVISIBILITY),
         terms: Some(Terms {
           cap: Some(u32::MAX.into()),
@@ -1688,6 +1711,48 @@ mod tests {
 
     case(
       Runestone {
+        mint: Some(RuneId::new(1, 2).unwrap()),
+        ..default()
+      },
+      &[Tag::Mint.into(), 1, Tag::Mint.into(), 2],
+    );
+
+    case(
+      Runestone {
+        mint: Some(RuneId::new(3, 4).unwrap()),
+        mint_amount: Some(u128::MAX),
+        ..default()
+      },
+      &[
+        Tag::Mint.into(),
+        3,
+        Tag::Mint.into(),
+        4,
+        Tag::MintAmount.into(),
+        u128::MAX,
+      ],
+    );
+
+    case(
+      Runestone {
+        etching: Some(Etching {
+          control: Some(RuneId::new(5, 6).unwrap()),
+          ..default()
+        }),
+        ..default()
+      },
+      &[
+        Tag::Flags.into(),
+        Flag::Etching.mask(),
+        Tag::Control.into(),
+        5,
+        Tag::Control.into(),
+        6,
+      ],
+    );
+
+    case(
+      Runestone {
         edicts: vec![
           Edict {
             id: RuneId::new(2, 3).unwrap(),
@@ -1701,6 +1766,7 @@ mod tests {
           },
         ],
         etching: Some(Etching {
+          control: None,
           divisibility: Some(7),
           premine: Some(8),
           rune: Some(Rune(9)),
@@ -1715,6 +1781,7 @@ mod tests {
           turbo: true,
         }),
         mint: Some(RuneId::new(17, 18).unwrap()),
+        mint_amount: None,
         pointer: Some(0),
       },
       &[
@@ -1763,6 +1830,7 @@ mod tests {
     case(
       Runestone {
         etching: Some(Etching {
+          control: None,
           divisibility: None,
           premine: None,
           rune: Some(Rune(3)),
@@ -1779,6 +1847,7 @@ mod tests {
     case(
       Runestone {
         etching: Some(Etching {
+          control: None,
           divisibility: None,
           premine: None,
           rune: None,
@@ -1843,6 +1912,150 @@ mod tests {
       decipher(&[Tag::Mint.into(), 1]),
       Artifact::Cenotaph(Cenotaph {
         flaw: Some(Flaw::UnrecognizedEvenTag),
+        ..default()
+      }),
+    );
+  }
+
+  #[test]
+  fn decipher_controlled_etching() {
+    assert_eq!(
+      decipher(&[
+        Tag::Flags.into(),
+        Flag::Etching.mask(),
+        Tag::Control.into(),
+        1,
+        Tag::Control.into(),
+        2,
+      ]),
+      Artifact::Runestone(Runestone {
+        etching: Some(Etching {
+          control: Some(RuneId::new(1, 2).unwrap()),
+          ..default()
+        }),
+        ..default()
+      }),
+    );
+  }
+
+  #[test]
+  fn control_without_etching_produces_cenotaph() {
+    assert_eq!(
+      decipher(&[Tag::Control.into(), 1, Tag::Control.into(), 2,]),
+      Artifact::Cenotaph(Cenotaph {
+        flaw: Some(Flaw::UnrecognizedEvenTag),
+        ..default()
+      }),
+    );
+  }
+
+  #[test]
+  fn malformed_control_produces_cenotaph() {
+    #[track_caller]
+    fn case(control: &[u128], expected: Option<RuneId>) {
+      let mut integers = vec![Tag::Flags.into(), Flag::Etching.mask()];
+      integers.extend_from_slice(control);
+
+      assert_eq!(
+        decipher(&integers),
+        Artifact::Cenotaph(Cenotaph {
+          control: expected,
+          flaw: Some(Flaw::UnrecognizedEvenTag),
+          ..default()
+        }),
+      );
+    }
+
+    case(&[Tag::Control.into(), 1], None);
+    case(&[Tag::Control.into(), 0, Tag::Control.into(), 1], None);
+    case(
+      &[
+        Tag::Control.into(),
+        u128::from(u64::MAX) + 1,
+        Tag::Control.into(),
+        0,
+      ],
+      None,
+    );
+    case(
+      &[
+        Tag::Control.into(),
+        1,
+        Tag::Control.into(),
+        u128::from(u32::MAX) + 1,
+      ],
+      None,
+    );
+    case(
+      &[
+        Tag::Control.into(),
+        1,
+        Tag::Control.into(),
+        2,
+        Tag::Control.into(),
+        3,
+      ],
+      Some(RuneId { block: 1, tx: 2 }),
+    );
+  }
+
+  #[test]
+  fn decipher_mint_amount() {
+    let artifact = decipher(&[
+      Tag::Mint.into(),
+      1,
+      Tag::Mint.into(),
+      2,
+      Tag::MintAmount.into(),
+      u128::MAX,
+    ]);
+
+    assert_eq!(artifact.mint_amount(), Some(u128::MAX));
+    assert_eq!(
+      artifact,
+      Artifact::Runestone(Runestone {
+        mint: Some(RuneId::new(1, 2).unwrap()),
+        mint_amount: Some(u128::MAX),
+        ..default()
+      }),
+    );
+  }
+
+  #[test]
+  fn mint_amount_without_mint_produces_cenotaph_and_is_preserved() {
+    let artifact = decipher(&[Tag::MintAmount.into(), 7]);
+
+    assert_eq!(artifact.mint_amount(), Some(7));
+    assert_eq!(
+      artifact,
+      Artifact::Cenotaph(Cenotaph {
+        flaw: Some(Flaw::UnrecognizedEvenTag),
+        mint_amount: Some(7),
+        ..default()
+      }),
+    );
+  }
+
+  #[test]
+  fn duplicate_mint_amount_produces_cenotaph_and_preserves_first_amount() {
+    let artifact = decipher(&[
+      Tag::Mint.into(),
+      1,
+      Tag::Mint.into(),
+      2,
+      Tag::MintAmount.into(),
+      7,
+      Tag::MintAmount.into(),
+      8,
+    ]);
+
+    assert_eq!(artifact.mint_amount(), Some(7));
+    assert_eq!(
+      artifact,
+      Artifact::Cenotaph(Cenotaph {
+        flaw: Some(Flaw::UnrecognizedEvenTag),
+        mint: Some(RuneId::new(1, 2).unwrap()),
+        mint_amount: Some(7),
         ..default()
       }),
     );

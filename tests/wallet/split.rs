@@ -100,6 +100,7 @@ fn simple_split() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         supply: "100.0".parse().unwrap(),
         divisibility: 1,
         terms: None,
@@ -222,6 +223,7 @@ fn oversize_op_returns_are_allowed_with_flag() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         supply: "10000000000".parse().unwrap(),
         divisibility: 0,
         terms: None,

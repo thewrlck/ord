@@ -118,6 +118,7 @@ fn mint_does_not_select_inscription() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 1,
         rune: SpacedRune {
           rune: Rune(RUNE),

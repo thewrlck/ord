@@ -1559,6 +1559,7 @@ fn batch_can_etch_rune() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune,
         supply: "1000".parse().unwrap(),
@@ -1671,6 +1672,7 @@ fn batch_can_etch_turbo_rune() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune,
         supply: "1000".parse().unwrap(),
@@ -1717,6 +1719,7 @@ fn batch_can_etch_rune_without_premine() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune,
         supply: "1000".parse().unwrap(),
@@ -1797,6 +1800,7 @@ fn batch_inscribe_can_etch_rune_with_offset() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune: SpacedRune {
           rune: Rune(RUNE),
@@ -1873,6 +1877,7 @@ fn batch_inscribe_can_etch_rune_with_height() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune: SpacedRune {
           rune: Rune(RUNE),
@@ -1950,6 +1955,7 @@ fn etch_existing_rune_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -1992,6 +1998,7 @@ fn etch_reserved_rune_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune::reserved(0, 0),
@@ -2034,6 +2041,7 @@ fn etch_sub_minimum_rune_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(0),
@@ -2076,6 +2084,7 @@ fn etch_requires_rune_index() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2118,6 +2127,7 @@ fn etch_divisibility_over_maximum_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 39,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2160,6 +2170,7 @@ fn etch_mintable_overflow_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2210,6 +2221,7 @@ fn etch_mintable_plus_premine_overflow_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2260,6 +2272,7 @@ fn incorrect_supply_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2310,6 +2323,7 @@ fn zero_offset_interval_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2360,6 +2374,7 @@ fn zero_height_interval_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2410,6 +2425,7 @@ fn invalid_start_height_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2462,6 +2478,7 @@ fn invalid_end_height_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2514,6 +2531,7 @@ fn zero_supply_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2556,6 +2574,7 @@ fn zero_cap_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2603,6 +2622,7 @@ fn zero_amount_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),
@@ -2650,6 +2670,7 @@ fn oversize_runestone_error() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(6402364363415443603228541259936211926 - 1),
@@ -2705,6 +2726,7 @@ fn oversize_runestones_are_allowed_with_no_limit() {
     "batch.yaml",
     serde_yaml::to_string(&batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune: SpacedRune {
           rune: Rune(6402364363415443603228541259936211926 - 1),
@@ -2758,6 +2780,7 @@ fn batch_inscribe_errors_if_pending_etchings() {
 
   let batchfile = batch::File {
     etching: Some(batch::Etching {
+      control: None,
       divisibility: 0,
       rune: SpacedRune {
         rune: Rune(RUNE),
@@ -2848,6 +2871,7 @@ fn forbid_etching_below_rune_activation_height() {
       "batch.yaml",
       serde_yaml::to_string(&batch::File {
         etching: Some(batch::Etching {
+          control: None,
           divisibility: 0,
           rune: SpacedRune {
             rune: Rune(RUNE),

@@ -80,6 +80,7 @@ impl Inscribe {
 
     batch::Plan {
       commit_fee_rate: self.shared.commit_fee_rate.unwrap_or(self.shared.fee_rate),
+      control_info: None,
       destinations: vec![match self.destination.clone() {
         Some(destination) => destination.require_network(chain.network())?,
         None => wallet.get_change_address()?,

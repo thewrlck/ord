@@ -9,6 +9,7 @@ use {
 fn get_batchfile() -> batch::File {
   batch::File {
     etching: Some(batch::Etching {
+      control: None,
       divisibility: 0,
       rune: SpacedRune {
         rune: Rune(RUNE),

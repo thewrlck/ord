@@ -688,6 +688,7 @@ mod tests {
               }],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -756,6 +757,7 @@ mod tests {
               }],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -835,6 +837,7 @@ mod tests {
               }],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -905,6 +908,7 @@ mod tests {
               }],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -979,6 +983,7 @@ mod tests {
               }],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -1050,6 +1055,7 @@ mod tests {
               }],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -1128,6 +1134,7 @@ mod tests {
               }],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -1208,6 +1215,7 @@ mod tests {
               ],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -1309,6 +1317,7 @@ mod tests {
               ],
               etching: None,
               mint: None,
+              mint_amount: None,
               pointer: None,
             }
             .encipher()
@@ -1407,6 +1416,7 @@ mod tests {
                   .collect(),
                 etching: None,
                 mint: None,
+                mint_amount: None,
                 pointer: None,
               }
               .encipher(),

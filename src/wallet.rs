@@ -1,6 +1,6 @@
 use {
   super::*,
-  batch::ParentInfo,
+  batch::{ParentInfo, RuneControlInfo},
   bitcoin::{
     bip32::{ChildNumber, DerivationPath, Xpriv},
     secp256k1::Secp256k1,
@@ -356,6 +356,68 @@ impl Wallet {
     let rune_json: api::Rune = serde_json::from_str(&response.text()?)?;
 
     Ok(Some((rune_json.id, rune_json.entry, rune_json.parent)))
+  }
+
+  pub(crate) fn get_rune_by_id(
+    &self,
+    id: RuneId,
+  ) -> Result<Option<(RuneId, RuneEntry, Option<InscriptionId>)>> {
+    let response = self
+      .ord_client
+      .get(self.rpc_url.join(&format!("/rune/{id}")).unwrap())
+      .send()?;
+
+    if response.status() == StatusCode::NOT_FOUND {
+      return Ok(None);
+    }
+
+    let rune_json: api::Rune = response.error_for_status()?.json()?;
+
+    Ok(Some((rune_json.id, rune_json.entry, rune_json.parent)))
+  }
+
+  pub(crate) fn get_rune_control_info(&self, id: RuneId) -> Result<RuneControlInfo> {
+    let (_, entry, _) = self
+      .get_rune_by_id(id)?
+      .with_context(|| format!("control rune `{id}` has not been etched"))?;
+
+    let inscribed = self
+      .inscriptions
+      .keys()
+      .map(|satpoint| satpoint.outpoint)
+      .collect::<HashSet<OutPoint>>();
+
+    let pending = self
+      .pending_etchings()?
+      .into_iter()
+      .flat_map(|(_, entry)| {
+        entry
+          .reveal
+          .input
+          .into_iter()
+          .map(|input| input.previous_output)
+      })
+      .collect::<HashSet<OutPoint>>();
+
+    for (outpoint, info) in &self.output_info {
+      if inscribed.contains(outpoint) || pending.contains(outpoint) {
+        continue;
+      }
+
+      if info.runes.as_ref().is_some_and(|runes| {
+        runes
+          .iter()
+          .any(|(rune, pile)| rune.rune == entry.spaced_rune.rune && pile.amount > 0)
+      }) {
+        return Ok(RuneControlInfo {
+          id,
+          outpoint: *outpoint,
+          tx_out: self.utxos[outpoint].clone(),
+        });
+      }
+    }
+
+    bail!("control rune `{}` not in wallet", entry.spaced_rune)
   }
 
   pub(crate) fn get_change_address(&self) -> Result<Address> {

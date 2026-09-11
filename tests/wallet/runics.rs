@@ -17,6 +17,7 @@ fn wallet_runics() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         premine: "1000".parse().unwrap(),
         rune: SpacedRune { rune, spacers: 1 },

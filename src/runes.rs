@@ -832,6 +832,7 @@ mod tests {
           output: 0,
         }],
         etching: Some(Etching {
+          control: None,
           premine: Some(u128::MAX),
           rune: Some(Rune(RUNE)),
           terms: Some(Terms {
@@ -857,6 +858,8 @@ mod tests {
         RuneEntry {
           block: id.block,
           burned: 0,
+          control: None,
+          controlled_minted: 0,
           divisibility: 0,
           etching: txid0,
           terms: None,
@@ -4218,6 +4221,239 @@ mod tests {
   }
 
   #[test]
+  fn rune_may_be_minted_by_control_rune_and_open_terms() {
+    let context = Context::builder().arg("--index-runes").build();
+
+    let (parent_txid, parent_id) = context.etch(
+      Runestone {
+        etching: Some(Etching {
+          premine: Some(1),
+          rune: Some(Rune(RUNE)),
+          ..default()
+        }),
+        ..default()
+      },
+      1,
+    );
+
+    let block_count = context.index.block_count().unwrap().into_usize();
+
+    context.mine_blocks(1);
+
+    context.core.broadcast_tx(TransactionTemplate {
+      inputs: &[(block_count, 0, 0, Witness::new())],
+      p2tr: true,
+      ..default()
+    });
+
+    context.mine_blocks(Runestone::COMMIT_CONFIRMATIONS.into());
+
+    let child_rune = Rune(RUNE + 1);
+    let child_runestone = Runestone {
+      etching: Some(Etching {
+        control: Some(parent_id),
+        rune: Some(child_rune),
+        terms: Some(Terms {
+          amount: Some(10),
+          cap: Some(1),
+          ..default()
+        }),
+        ..default()
+      }),
+      pointer: Some(0),
+      ..default()
+    };
+
+    let mut witness = Witness::new();
+    witness.push(
+      script::Builder::new()
+        .push_slice::<&PushBytes>(child_rune.commitment().as_slice().try_into().unwrap())
+        .into_script(),
+    );
+    witness.push([]);
+
+    let child_txid = context.core.broadcast_tx(TransactionTemplate {
+      inputs: &[
+        (block_count + 1, 1, 0, witness),
+        (parent_id.block.try_into().unwrap(), 1, 0, Witness::new()),
+      ],
+      op_return: Some(child_runestone.encipher()),
+      outputs: 1,
+      ..default()
+    });
+
+    context.mine_blocks(1);
+
+    let child_id = RuneId {
+      block: u64::try_from(block_count + usize::from(Runestone::COMMIT_CONFIRMATIONS) + 1).unwrap(),
+      tx: 1,
+    };
+
+    context.core.broadcast_tx(TransactionTemplate {
+      inputs: &[(child_id.block.try_into().unwrap(), 0, 0, Witness::new())],
+      op_return: Some(
+        Runestone {
+          mint: Some(child_id),
+          mint_amount: Some(500),
+          ..default()
+        }
+        .encipher(),
+      ),
+      outputs: 1,
+      ..default()
+    });
+
+    context.mine_blocks(1);
+
+    let controlled_txid = context.core.broadcast_tx(TransactionTemplate {
+      inputs: &[(child_id.block.try_into().unwrap(), 1, 0, Witness::new())],
+      op_return: Some(
+        Runestone {
+          mint: Some(child_id),
+          mint_amount: Some(777),
+          pointer: Some(0),
+          ..default()
+        }
+        .encipher(),
+      ),
+      outputs: 1,
+      ..default()
+    });
+
+    context.mine_blocks(1);
+
+    let open_txid = context.core.broadcast_tx(TransactionTemplate {
+      inputs: &[(
+        (child_id.block + 1).try_into().unwrap(),
+        0,
+        0,
+        Witness::new(),
+      )],
+      op_return: Some(
+        Runestone {
+          mint: Some(child_id),
+          ..default()
+        }
+        .encipher(),
+      ),
+      outputs: 1,
+      ..default()
+    });
+
+    context.mine_blocks(1);
+
+    context.assert_runes(
+      [
+        (
+          parent_id,
+          RuneEntry {
+            block: parent_id.block,
+            etching: parent_txid,
+            premine: 1,
+            spaced_rune: SpacedRune {
+              rune: Rune(RUNE),
+              spacers: 0,
+            },
+            timestamp: parent_id.block,
+            ..default()
+          },
+        ),
+        (
+          child_id,
+          RuneEntry {
+            block: child_id.block,
+            control: Some(parent_id),
+            controlled_minted: 777,
+            etching: child_txid,
+            mints: 1,
+            number: 1,
+            spaced_rune: SpacedRune {
+              rune: child_rune,
+              spacers: 0,
+            },
+            terms: Some(Terms {
+              amount: Some(10),
+              cap: Some(1),
+              ..default()
+            }),
+            timestamp: child_id.block,
+            ..default()
+          },
+        ),
+      ],
+      [
+        (
+          OutPoint {
+            txid: controlled_txid,
+            vout: 0,
+          },
+          vec![(parent_id, 1), (child_id, 777)],
+        ),
+        (
+          OutPoint {
+            txid: open_txid,
+            vout: 0,
+          },
+          vec![(child_id, 10)],
+        ),
+      ],
+    );
+  }
+
+  #[test]
+  fn controlled_etching_requires_control_rune_in_inputs() {
+    let context = Context::builder().arg("--index-runes").build();
+
+    let (parent_txid, parent_id) = context.etch(
+      Runestone {
+        etching: Some(Etching {
+          premine: Some(1),
+          rune: Some(Rune(RUNE)),
+          ..default()
+        }),
+        ..default()
+      },
+      1,
+    );
+
+    context.etch(
+      Runestone {
+        etching: Some(Etching {
+          control: Some(parent_id),
+          rune: Some(Rune(RUNE + 1)),
+          ..default()
+        }),
+        ..default()
+      },
+      1,
+    );
+
+    context.assert_runes(
+      [(
+        parent_id,
+        RuneEntry {
+          block: parent_id.block,
+          etching: parent_txid,
+          premine: 1,
+          spaced_rune: SpacedRune {
+            rune: Rune(RUNE),
+            spacers: 0,
+          },
+          timestamp: parent_id.block,
+          ..default()
+        },
+      )],
+      [(
+        OutPoint {
+          txid: parent_txid,
+          vout: 0,
+        },
+        vec![(parent_id, 1)],
+      )],
+    );
+  }
+
+  #[test]
   fn open_mints_can_be_limited_with_offset_end() {
     let context = Context::builder().arg("--index-runes").build();
 
@@ -6082,6 +6318,8 @@ mod tests {
           RuneEntry {
             block: 1,
             burned: 0,
+            control: None,
+            controlled_minted: 0,
             divisibility: 0,
             etching: Txid::all_zeros(),
             mints: 0,

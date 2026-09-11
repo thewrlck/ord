@@ -63,6 +63,13 @@ pub struct ParentInfo {
   pub tx_out: TxOut,
 }
 
+#[derive(Clone, Debug)]
+pub struct RuneControlInfo {
+  pub id: RuneId,
+  pub outpoint: OutPoint,
+  pub tx_out: TxOut,
+}
+
 #[cfg(test)]
 mod tests {
   use {

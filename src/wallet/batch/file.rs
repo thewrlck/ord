@@ -398,6 +398,7 @@ inscriptions:
         sat: None,
         satpoint: None,
         etching: Some(Etching {
+          control: None,
           rune: "THE•BEST•RUNE".parse().unwrap(),
           divisibility: 2,
           premine: "1000.00".parse().unwrap(),

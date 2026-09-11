@@ -53,7 +53,7 @@ mod utxo_entry;
 #[cfg(test)]
 pub(crate) mod testing;
 
-const SCHEMA_VERSION: u64 = 34;
+const SCHEMA_VERSION: u64 = 35;
 
 define_multimap_table! { LATEST_CHILD_SEQUENCE_NUMBER_TO_COLLECTION_SEQUENCE_NUMBER, u32, u32 }
 define_multimap_table! { SAT_TO_SEQUENCE_NUMBER, u64, u32 }
@@ -395,6 +395,8 @@ impl Index {
             RuneEntry {
               block: id.block,
               burned: 0,
+              control: None,
+              controlled_minted: 0,
               divisibility: 0,
               etching,
               terms: Some(Terms {
