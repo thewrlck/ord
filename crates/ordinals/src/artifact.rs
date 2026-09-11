@@ -13,4 +13,11 @@ impl Artifact {
       Self::Runestone(runestone) => runestone.mint,
     }
   }
+
+  pub fn mint_amount(&self) -> Option<u128> {
+    match self {
+      Self::Cenotaph(cenotaph) => cenotaph.mint_amount,
+      Self::Runestone(runestone) => runestone.mint_amount,
+    }
+  }
 }

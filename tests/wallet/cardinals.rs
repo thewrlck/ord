@@ -41,6 +41,7 @@ fn cardinals_does_not_show_runic_outputs() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         supply: "1000".parse().unwrap(),
         divisibility: 0,
         terms: None,

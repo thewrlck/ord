@@ -2,6 +2,7 @@ use super::*;
 
 pub struct Plan {
   pub(crate) commit_fee_rate: FeeRate,
+  pub(crate) control_info: Option<RuneControlInfo>,
   pub(crate) destinations: Vec<Address>,
   pub(crate) dry_run: bool,
   pub(crate) etching: Option<Etching>,
@@ -21,6 +22,7 @@ impl Default for Plan {
   fn default() -> Self {
     Self {
       commit_fee_rate: 1.0.try_into().unwrap(),
+      control_info: None,
       destinations: Vec::new(),
       dry_run: false,
       etching: None,
@@ -130,10 +132,19 @@ impl Plan {
       .send_raw_transaction(&signed_commit_tx)?;
 
     if let Some(ref rune_info) = rune {
-      wallet.bitcoin_client().lock_unspent(&[OutPoint {
+      let mut outputs = vec![OutPoint {
         txid: commit_txid,
         vout: commit_vout.try_into().unwrap(),
-      }])?;
+      }];
+
+      if let Some(control) = &self.control_info {
+        outputs.push(control.outpoint);
+      }
+
+      ensure!(
+        wallet.bitcoin_client().lock_unspent(&outputs)?,
+        "failed to lock rune etching inputs"
+      );
 
       let commit = consensus::encode::deserialize::<Transaction>(&signed_commit_tx)?;
       let reveal = consensus::encode::deserialize::<Transaction>(&signed_reveal_tx)?;
@@ -412,6 +423,10 @@ impl Plan {
       }
     }
 
+    if let Some(control) = &self.control_info {
+      reveal_inputs.push(control.outpoint);
+    }
+
     reveal_inputs.push(OutPoint::null());
 
     for (i, destination) in self.destinations.iter().enumerate() {
@@ -438,7 +453,7 @@ impl Plan {
         destination = Some(reveal_change.clone());
 
         reveal_outputs.push(TxOut {
-          script_pubkey: reveal_change.into(),
+          script_pubkey: reveal_change.script_pubkey(),
           value: TARGET_POSTAGE,
         });
 
@@ -448,9 +463,27 @@ impl Plan {
         destination = None;
       }
 
+      let control_output = self.control_info.as_ref().map(|control| {
+        let output = u32::try_from(reveal_outputs.len()).unwrap();
+        reveal_outputs.push(TxOut {
+          script_pubkey: reveal_change.script_pubkey(),
+          value: control.tx_out.value,
+        });
+        output
+      });
+
       let inner = Runestone {
-        edicts: Vec::new(),
+        edicts: match (premine, vout, control_output) {
+          (0, _, _) | (_, _, None) => Vec::new(),
+          (_, Some(output), Some(_)) => vec![Edict {
+            id: RuneId::default(),
+            amount: premine,
+            output,
+          }],
+          _ => unreachable!(),
+        },
         etching: Some(ordinals::Etching {
+          control: self.control_info.as_ref().map(|control| control.id),
           divisibility: (etching.divisibility > 0).then_some(etching.divisibility),
           premine: (premine > 0).then_some(premine),
           rune: Some(etching.rune.rune),
@@ -476,7 +509,8 @@ impl Plan {
           turbo: etching.turbo,
         }),
         mint: None,
-        pointer: (premine > 0).then_some((reveal_outputs.len() - 1).try_into().unwrap()),
+        mint_amount: None,
+        pointer: control_output.or(vout),
       };
 
       let script_pubkey = inner.encipher();
@@ -502,7 +536,9 @@ impl Plan {
       runestone = None;
     }
 
-    let commit_input = self.parent_info.len() + self.reveal_satpoints.len();
+    let commit_input = self.parent_info.len()
+      + self.reveal_satpoints.len()
+      + usize::from(self.control_info.is_some());
 
     let (_reveal_tx, reveal_fee) = Self::build_reveal_transaction(
       commit_input,
@@ -577,6 +613,10 @@ impl Plan {
       for (_satpoint, txout) in self.reveal_satpoints.iter() {
         prevouts.push(txout.clone());
       }
+    }
+
+    if let Some(control) = &self.control_info {
+      prevouts.push(control.tx_out.clone());
     }
 
     prevouts.push(unsigned_commit_tx.output[vout].clone());
@@ -720,11 +760,12 @@ impl Plan {
     let reveal_tx = Transaction {
       input: input
         .into_iter()
-        .map(|previous_output| TxIn {
+        .enumerate()
+        .map(|(index, previous_output)| TxIn {
           previous_output,
           script_sig: script::Builder::new().into_script(),
           witness: Witness::new(),
-          sequence: if etching {
+          sequence: if etching && index == commit_input_index {
             Sequence::from_height(Runestone::COMMIT_CONFIRMATIONS - 1)
           } else {
             Sequence::ENABLE_RBF_NO_LOCKTIME

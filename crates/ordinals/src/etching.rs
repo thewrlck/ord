@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Default, Serialize, Deserialize, Debug, PartialEq, Copy, Clone, Eq)]
 pub struct Etching {
+  pub control: Option<RuneId>,
   pub divisibility: Option<u8>,
   pub premine: Option<u128>,
   pub rune: Option<Rune>,

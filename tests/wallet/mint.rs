@@ -1,6 +1,99 @@
 use {super::*, ord::decimal::Decimal, ord::subcommand::wallet::mint};
 
 #[test]
+fn controlled_and_open_mint_can_coexist() {
+  let core = mockcore::builder().network(Network::Regtest).build();
+
+  let ord = TestServer::spawn_with_server_args(&core, &["--index-runes", "--regtest"], &[]);
+
+  create_wallet(&core, &ord);
+
+  let parent = etch(&core, &ord, Rune(RUNE));
+  let child = Rune(RUNE + 1);
+
+  batch(
+    &core,
+    &ord,
+    batch::File {
+      etching: Some(batch::Etching {
+        control: Some(SpacedRune {
+          rune: Rune(RUNE),
+          spacers: 0,
+        }),
+        divisibility: 0,
+        rune: SpacedRune {
+          rune: child,
+          spacers: 0,
+        },
+        premine: "0".parse().unwrap(),
+        supply: "21".parse().unwrap(),
+        symbol: '¢',
+        terms: Some(batch::Terms {
+          amount: "21".parse().unwrap(),
+          cap: 1,
+          ..default()
+        }),
+        turbo: false,
+      }),
+      inscriptions: vec![batch::Entry {
+        file: Some("inscription.jpeg".into()),
+        ..default()
+      }],
+      ..default()
+    },
+  );
+
+  let controlled = CommandBuilder::new(format!(
+    "--regtest --index-runes wallet mint --fee-rate 1 --rune {child} --amount 777"
+  ))
+  .core(&core)
+  .ord(&ord)
+  .run_and_deserialize_output::<mint::Output>();
+
+  assert_eq!(controlled.pile.amount, 777);
+
+  core.mine_blocks(1);
+
+  let open = CommandBuilder::new(format!(
+    "--regtest --index-runes wallet mint --fee-rate 1 --rune {child}"
+  ))
+  .core(&core)
+  .ord(&ord)
+  .run_and_deserialize_output::<mint::Output>();
+
+  assert_eq!(open.pile.amount, 21);
+
+  core.mine_blocks(1);
+
+  CommandBuilder::new(format!(
+    "--regtest --index-runes wallet mint --fee-rate 1 --rune {child} --amount 1"
+  ))
+  .core(&core)
+  .ord(&ord)
+  .run_and_deserialize_output::<mint::Output>();
+
+  core.mine_blocks(1);
+
+  let balance = CommandBuilder::new("--regtest --index-runes wallet balance")
+    .core(&core)
+    .ord(&ord)
+    .run_and_deserialize_output::<ord::subcommand::wallet::balance::Output>();
+
+  let runes = balance.runes.unwrap();
+  assert_eq!(
+    runes[&parent.output.rune.unwrap().rune],
+    "1000".parse().unwrap()
+  );
+  assert_eq!(
+    runes[&SpacedRune {
+      rune: child,
+      spacers: 0,
+    }],
+    "799".parse().unwrap()
+  );
+}
+
+#[test]
 fn minting_rune_and_fails_if_after_end() {
   let core = mockcore::builder().network(Network::Regtest).build();
 
@@ -15,6 +108,7 @@ fn minting_rune_and_fails_if_after_end() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 1,
         rune: SpacedRune {
           rune: Rune(RUNE),
@@ -112,6 +206,7 @@ fn minting_rune_fails_if_not_mintable() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 1,
         rune: SpacedRune {
           rune: Rune(RUNE),
@@ -178,6 +273,7 @@ fn minting_rune_and_then_sending_works() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune: SpacedRune {
           rune: Rune(RUNE),
@@ -278,6 +374,7 @@ fn minting_rune_with_destination() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune: SpacedRune {
           rune: Rune(RUNE),
@@ -383,6 +480,7 @@ fn minting_rune_with_postage() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune: SpacedRune {
           rune: Rune(RUNE),
@@ -452,6 +550,7 @@ fn minting_rune_with_postage_dust() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune: SpacedRune {
           rune: Rune(RUNE),
@@ -505,6 +604,7 @@ fn minting_is_allowed_when_mint_begins_next_block() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 1,
         rune: SpacedRune {
           rune: Rune(RUNE),

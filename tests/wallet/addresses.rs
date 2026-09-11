@@ -15,6 +15,7 @@ fn addresses() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 3,
         premine: "1.111".parse().unwrap(),
         rune: SpacedRune { rune, spacers: 1 },

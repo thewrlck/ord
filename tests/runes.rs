@@ -48,6 +48,8 @@ fn one_rune() {
         RuneInfo {
           block: 7,
           burned: 0,
+          control: None,
+          controlled_minted: 0,
           divisibility: 0,
           etching: etch.output.reveal,
           id: RuneId { block: 7, tx: 1 },
@@ -94,6 +96,8 @@ fn two_runes() {
           RuneInfo {
             block: 7,
             burned: 0,
+            control: None,
+            controlled_minted: 0,
             divisibility: 0,
             etching: a.output.reveal,
             id: RuneId { block: 7, tx: 1 },
@@ -117,6 +121,8 @@ fn two_runes() {
           RuneInfo {
             block: 14,
             burned: 0,
+            control: None,
+            controlled_minted: 0,
             divisibility: 0,
             etching: b.output.reveal,
             id: RuneId { block: 14, tx: 1 },

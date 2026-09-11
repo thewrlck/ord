@@ -32,6 +32,7 @@ struct Runestone {
   edicts: Vec<Edict>,
   etching: Option<Etching>,
   mint: Option<RuneId>,
+  mint_amount: Option<u128>,
   pointer: Option<u32>,
 }
 ```
@@ -40,6 +41,7 @@ Runes are created by etchings:
 
 ```rust
 struct Etching {
+  control: Option<RuneId>,
   divisibility: Option<u8>,
   premine: Option<u128>,
   rune: Option<Rune>,
@@ -214,6 +216,7 @@ struct Runestone {
   edicts: Vec<Edict>,
   etching: Option<Etching>,
   mint: Option<RuneId>,
+  mint_amount: Option<u128>,
   pointer: Option<u32>,
 }
 ```
@@ -234,6 +237,8 @@ enum Tag {
   OffsetEnd = 18,
   Mint = 20,
   Pointer = 22,
+  Control = 24,
+  MintAmount = 26,
   Cenotaph = 126,
 
   Divisibility = 1,
@@ -316,6 +321,17 @@ closes in the block with height `OffsetEnd` + `ETCHING_HEIGHT`.
 
 The `Mint` field contains the Rune ID of the rune to be minted in this
 transaction.
+
+##### Control
+
+The `Control` field contains the Rune ID of the control rune for an etching.
+The etching transaction must spend an input containing a positive balance of
+the control rune. Any positive balance authorizes the etching.
+
+##### MintAmount
+
+The `MintAmount` field contains the amount for a controlled mint. It may only
+be present with `Mint`.
 
 ##### Pointer
 
@@ -405,6 +421,7 @@ A runestone may contain an etching:
 
 ```rust
 struct Etching {
+  control: Option<RuneId>,
   divisibility: Option<u8>,
   premine: Option<u128>,
   rune: Option<Rune>,
@@ -477,14 +494,24 @@ witness tapscript where the output being spent has at least six confirmations.
 
 If a valid commitment is not present, the etching is ignored.
 
+If `control` is present, the etching transaction must spend an input containing
+a positive balance of that rune. The association is immutable once etched.
+
 #### Minting
 
 A runestone may mint a rune by including the rune's ID in the `Mint` field.
 
-If the mint is open, the mint amount is added to the unallocated runes in the
+If `MintAmount` is absent and the mint is open, the amount defined by the
+etching terms is added to the unallocated runes in the
 transaction's inputs. These runes may be transferred using edicts, and will
 otherwise be transferred to the first non-`OP_RETURN` output, or the output
 designated by the `Pointer` field.
+
+If `MintAmount` is present, the rune must have a control rune and the
+transaction must spend an input containing a positive balance of that control
+rune. The specified amount is minted independently of open mint terms, caps,
+and height windows. A rune may have both open mint terms and a control rune.
+Controlled mints do not consume the open mint cap.
 
 Mints may be made in any transaction after an etching, including in the same
 block.

@@ -102,6 +102,7 @@ fn runic_utxos_are_deducted_from_cardinal() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         premine: "1000".parse().unwrap(),
         rune: SpacedRune { rune, spacers: 1 },
@@ -214,6 +215,7 @@ fn runic_utxos_are_displayed_with_decimal_amount() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 3,
         premine: "1.111".parse().unwrap(),
         rune: SpacedRune { rune, spacers: 1 },

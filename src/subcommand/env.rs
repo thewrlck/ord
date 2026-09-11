@@ -81,6 +81,7 @@ rpcport={bitcoind_port}
 
     let yaml = serde_yaml::to_string(&batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 0,
         rune: "FOO".parse::<SpacedRune>().unwrap(),
         supply: "2000".parse().unwrap(),

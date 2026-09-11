@@ -1062,6 +1062,7 @@ fn sending_rune_with_divisibility_works() {
     &ord,
     batch::File {
       etching: Some(batch::Etching {
+        control: None,
         divisibility: 1,
         rune: SpacedRune { rune, spacers: 0 },
         premine: "1000".parse().unwrap(),
@@ -1281,6 +1282,7 @@ fn sending_rune_creates_transaction_with_expected_runestone() {
         output: 2
       }],
       mint: None,
+      mint_amount: None,
     }),
   );
 }
